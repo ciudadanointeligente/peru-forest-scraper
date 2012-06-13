@@ -5,12 +5,11 @@ require 'rest-client'
 
 class ForestalTableScrapper
 	def initialize
-		@source_sheet_eia_cites = 'db_sheet1.csv'
-		@source_sheet_osinfor_eia = 'db_sheet2.csv'
-		@source_sheet_osinfor_conclusions = 'db_sheet3.csv'
+		@source_sheet_eia_cites = 'docs/db_sheet1.csv'
+		@source_sheet_osinfor_eia = 'docs/db_sheet2.csv'
+		@source_sheet_osinfor_conclusions = 'docs/db_sheet3.csv'
 		@data = []
 		@exportations_url = 'http://api.ciudadanointeligente.cl/forestal/pe/exportations'
-		@contracts_url = 'http://api.ciudadanointeligente.cl/forestal/pe/contracts'
 		@batches_url = 'http://api.ciudadanointeligente.cl/forestal/pe/batches'
 		@supervision_report_url = 'http://api.ciudadanointeligente.cl/forestal/pe/supervision_reports'
 	end
@@ -20,7 +19,7 @@ class ForestalTableScrapper
 		end
 		for i in 0..@data.length
 			if !@data[i][2].nil?
-				#Si no cuenta con numero de exportation se tratara como un lote
+				#If you haven't num_exportation it's treated as a batch
 				exportation_data {
 				:num_exportation => @data[i][2],
 				:year => @data[i][1],
@@ -38,27 +37,38 @@ class ForestalTableScrapper
 			batch_data {
 				:id => i,
 				:forestal_transport_guide => @data[i][11],
+				:contract_code => @data[i][12],
+				:contract_holder => @data[i][13],
 				:volume => @data[i][14],
 				:zafra => @data[i][15],
 				:proprietary => @data[i][17],
 				:receiver => @data[i][18],
 				:basin => @data[i][19],
 				:observation => @data[i][20],
-				#:contracts_ids => @data[i][],
 			}
 
 			RestClient.put @exportations_url, exportation_data, {:content_type => :json}
 			RestClient.put @batches_url, batch_data, {:content_type => :json}
 		end
 	end
-	def process_osinfor_eia
+	def process_reports
+		#Sheet with the official reports
 		CSV.foreach(@source_sheet_osinfor_eia, :col_sep => "|") do |row|
 			@data << row
 		end
 		for i in 0..@data.length
+			supervision_report_data {
+				:supervision_report_code => @data[i][0],
+				:contract_holder => @data[i][1],
+				:contract_code => @data[i][2],
+				:concession => @data[i][3],
+				:department => @data[i][4],
+				:conclusion => @data[i][5], #.gsub(/\n/,''),
+			}
+
+			RestClient.put @supervision_report_url, supervision_report_data, {:content_type => :json}
 		end
-	end
-	def process_osinfor_conclusions
+		#Sheet with Julia's annotations
 		CSV.foreach(@source_sheet_osinfor_conclusions, :col_sep => "|") do |row|
 			@data << row
 		end
