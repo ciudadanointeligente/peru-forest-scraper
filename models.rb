@@ -21,39 +21,23 @@ class Exportation
   index :num_exportation, :unique => true
 end
 
-class Contract
-  include Mongoid::Document
-
-  # Relations
-  belongs_to :batches
-  belongs_to :supervision_reports
-
-  # Fields
-  field :id, :class => String
-  field :contract_code, :class => String
-  field :holder, :class => String
-
-  # Indexes
-  index :id, :unique => true
-end
-
 class Batch
   include Mongoid::Document
 
   # Relations
   belongs_to :exportation
-  has_many :contracts
 
   # Fields
   field :id, :class => String
   field :forestal_transport_guide, :class => String
+  field :contract_code, :class => String
+  field :contract_holder, :class => String
   field :volume, :class => Float
   field :zafra, :class => String
   field :proprietary, :class => String
   field :receiver, :class => String
   field :basin, :class => String
   field :observation, :class => String
-  field :contracts_ids, :class => Array
 
   # Indexes
   index :id, :unique => true
@@ -61,9 +45,6 @@ end
 
 class SupervisionReport
   include Mongoid::Document
-
-  # Relations
-  has_many :contracts
 
   # Fields
   field :supervision_report_code, :class => String
