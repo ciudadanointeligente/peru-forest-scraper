@@ -77,16 +77,11 @@ class ForestalTableScrapper
 		end
 		for i in 1..(@data.length-1)
 			#If exist the report, then adds Julia's annotations
-			if (RestClient.get @supervision_report_url, {:params => {:supervision_report_code => @data[i][0]}}).nil?
-				report = RestClient.get @supervision_report_url, {:params => {:supervision_report_code => @data[i][0]}}
-				report_clean = report.gsub('"', "'").gsub(':', '=>')
-				report_hash = eval(report_clean)
-				report_hash = report_hash["supervision_reports"][0]
-				#report_hash["supervision_reports"][0].store("priority",1)
-				report_hash.store("priority",1)
-				puts 'Adds annotations to the supervision report N.'+@data[i][0]
+			if !(RestClient.get @supervision_report_url, {:params => {:supervision_report_code => @data[i][0]}}).nil?
+				remote_id = (RestClient.get @supervision_report_url, {:params => {:supervision_report_code => @data[i][0]}}).scan(/\"id\":\"(\d*)\"/).flatten[0]
+				puts 'Adds annotations to the supervision report Nº '+@data[i][0]
 
-				RestClient.post @supervision_report_url, report_hash, {:content_type => :json}
+				RestClient.post @supervision_report_url, {:id => remote_id, :conclusion => @data[i][4], :priority => @data[i][5]}, {:content_type => :json}
 			end
 		end
 	end
