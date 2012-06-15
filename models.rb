@@ -47,15 +47,17 @@ class SupervisionReport
   include Mongoid::Document
 
   # Fields
+  field :id, :class => String
   field :supervision_report_code, :class => String
   field :contract_holder, :class => String
   field :contract_code, :class => String
   field :concession, :class => String
   field :department, :class => String
   field :conclusion, :class => String
+  field :priority, :class => String
 
   # Indexes
-  index :num_supervision_report, :unique => true
+  index :id, :unique => true
 end
 
 # record information about every API request
