@@ -17,10 +17,10 @@ class ForestalTableScrapper
 		CSV.foreach(@source_sheet_eia_cites, :col_sep => "|") do |row|
 			@data << row
 		end
-		for i in 0..@data.length
+		for i in 1..@data.length
 			if !@data[i][2].nil?
 				#If you haven't num_exportation it's treated as a batch
-				exportation_data {
+				exportation_data = {
 				:num_exportation => @data[i][2],
 				:year => @data[i][1],
 				:num_cites => @data[i][3],
@@ -34,7 +34,7 @@ class ForestalTableScrapper
 				#:batches_ids => @data[i][],
 			}
 			end
-			batch_data {
+			batch_data = {
 				:id => i,
 				:forestal_transport_guide => @data[i][11],
 				:contract_code => @data[i][12],
@@ -56,8 +56,9 @@ class ForestalTableScrapper
 		CSV.foreach(@source_sheet_osinfor_eia, :col_sep => "|") do |row|
 			@data << row
 		end
-		for i in 0..@data.length
-			supervision_report_data {
+		for i in 1..(@data.length-1)
+			supervision_report_data = {
+				:id => i,
 				:supervision_report_code => @data[i][0],
 				:contract_holder => @data[i][1],
 				:contract_code => @data[i][2],
@@ -68,11 +69,25 @@ class ForestalTableScrapper
 
 			RestClient.put @supervision_report_url, supervision_report_data, {:content_type => :json}
 		end
+	end
+	def process_reports_with_annotations
 		#Sheet with Julia's annotations
 		CSV.foreach(@source_sheet_osinfor_conclusions, :col_sep => "|") do |row|
 			@data << row
 		end
-		for i in 0..@data.length
+		for i in 1..(@data.length-1)
+			#If exist the report, then adds Julia's annotations
+			if (RestClient.get @supervision_report_url, {:params => {:supervision_report_code => @data[i][0]}}).nil?
+				report = RestClient.get @supervision_report_url, {:params => {:supervision_report_code => @data[i][0]}}
+				report_clean = report.gsub('"', "'").gsub(':', '=>')
+				report_hash = eval(report_clean)
+				report_hash = report_hash["supervision_reports"][0]
+				#report_hash["supervision_reports"][0].store("priority",1)
+				report_hash.store("priority",1)
+				puts 'Adds annotations to the supervision report N.'+@data[i][0]
+
+				RestClient.post @supervision_report_url, report_hash, {:content_type => :json}
+			end
 		end
 	end
 end
