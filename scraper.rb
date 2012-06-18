@@ -4,33 +4,51 @@ require 'csv'
 require 'rest-client'
 
 class ForestalTableScrapper
+	attr_accessor :source_sheet_eia_cites, :source_sheet_osinfor_eia, :source_sheet_osinfor_conclusions, :data, :current_exportation_id, :current_batches_ids, :exportation_data, :exportations_url, :batches_url, :supervision_report_url
+
 	def initialize
 		@source_sheet_eia_cites = 'docs/db_sheet1.csv'
 		@source_sheet_osinfor_eia = 'docs/db_sheet2.csv'
 		@source_sheet_osinfor_conclusions = 'docs/db_sheet3.csv'
 		@data = []
+		@current_batches_ids = []
 		@current_exportation_id = nil
-		@current_batches_ids = Array.new
+		@exportation_data = Hash.new
 		@exportations_url = 'http://api.ciudadanointeligente.cl/forestal/pe/exportations'
 		@batches_url = 'http://api.ciudadanointeligente.cl/forestal/pe/batches'
 		@supervision_report_url = 'http://api.ciudadanointeligente.cl/forestal/pe/supervision_reports'
+
 	end
 	def process_eia_cites
+		@data = []
 		CSV.foreach(@source_sheet_eia_cites, :col_sep => "|") do |row|
 			@data << row
 		end
-		for i in 1..@data.length
-			if !@data[i][2].nil? #enter only if is a new exportation
-				if !@current_batches_ids.empty? #enter to insert to the exportation collection
-					RestClient.post @exportations_url, {:id => @current_exportation_id, :batches_ids => @current_batches_ids}, {:content_type => :json}
-					@current_exportation_id = []
+		puts 'Number of rows to process: '+(@data.length-1).to_s
+		for i in 1..(@data.length)
+			if @data[i].nil? #for the last exportation
+				@exportation_data.store('id', @current_exportation_id)
+				@exportation_data.store('batches_ids', @current_batches_ids)
+
+				RestClient.put @exportations_url, @exportation_data, {:content_type => :json}
+				puts 'Finalizado'
+				exit
+			end
+			if (!@data[i][2].nil?) #for an exportation do
+				if !@current_batches_ids.empty? #insert the previous exportation
+					@exportation_data.store('id', @current_exportation_id)
+					@exportation_data.store('batches_ids', @current_batches_ids)
+
+					RestClient.put @exportations_url, @exportation_data, {:content_type => :json}
+					@current_batches_ids = []
 					@current_exportation_id = nil
+					@exportation_data = {}
 				end
+				puts 'Process exportation Nº '+@data[i][2]
 				if @current_exportation_id.nil?
 					@current_exportation_id = i
 				end
-				exportation_data = {
-					:id => i,
+				@exportation_data = {
 					:num_exportation => @data[i][2],
 					:year => @data[i][1],
 					:num_cites => @data[i][3],
@@ -57,12 +75,12 @@ class ForestalTableScrapper
 				:observation => @data[i][20],
 			}
 
-			#RestClient.put @exportations_url, exportation_data, {:content_type => :json}
 			RestClient.put @batches_url, batch_data, {:content_type => :json}
 		end
 	end
 	def process_reports
 		#Sheet with the official reports
+		@data = []
 		CSV.foreach(@source_sheet_osinfor_eia, :col_sep => "|") do |row|
 			@data << row
 		end
@@ -82,9 +100,11 @@ class ForestalTableScrapper
 	end
 	def process_reports_with_annotations
 		#Sheet with Julia's annotations
+		@data = []
 		CSV.foreach(@source_sheet_osinfor_conclusions, :col_sep => "|") do |row|
 			@data << row
 		end
+		puts 'Number of rows to process: '+(@data.length-1).to_s
 		for i in 1..(@data.length-1)
 			#If exist the report, then adds Julia's annotations
 			if !(RestClient.get @supervision_report_url, {:params => {:supervision_report_code => @data[i][0]}}).nil?
@@ -95,4 +115,14 @@ class ForestalTableScrapper
 			end
 		end
 	end
+end
+
+if !(defined? Test::Unit::TestCase)
+	bot = ForestalTableScrapper.new
+	puts '1/3 Procesando reportes...'
+	bot.process_reports
+	puts '2/3 Procesando reportes con comentarios...'
+	bot.process_reports_with_annotations
+	#puts '3/3 Procesando exportaciones con lotes...'
+	#bot.process_eia_cites
 end
