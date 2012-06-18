@@ -5,6 +5,7 @@ class Exportation
   has_many :batches
 
   # Fields
+  field :id, :class => String
   field :num_exportation, :class => String
   field :year, :class => Date
   field :num_cites, :class => Integer
@@ -18,7 +19,8 @@ class Exportation
   field :batches_ids, :class => Array
 
   # Indexes
-  index :num_exportation, :unique => true
+  index :id, :unique => true
+  index :num_exportation
 end
 
 class Batch
@@ -58,6 +60,7 @@ class SupervisionReport
 
   # Indexes
   index :id, :unique => true
+  index :supervision_report_code
 end
 
 # record information about every API request

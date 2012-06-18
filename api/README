@@ -1,0 +1,4 @@
+README
+
+This folder include the models.rb file used in the API. If you need modify the data models remember apply this changes in the API instance.
+https://github.com/ciudadanointeligente/billit-api
