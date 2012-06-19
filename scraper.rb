@@ -17,11 +17,48 @@ class ForestalTableScrapper
 		@exportations_url = 'http://api.ciudadanointeligente.cl/forestal/pe/exportations'
 		@batches_url = 'http://api.ciudadanointeligente.cl/forestal/pe/batches'
 		@supervision_report_url = 'http://api.ciudadanointeligente.cl/forestal/pe/supervision_reports'
+	end
+	def process_reports
+		#Sheet with the official reports
+		@data = []
+		CSV.foreach(@source_sheet_osinfor_eia, :col_sep => '|') do |row|
+			@data << row
+		end
+		for i in 1..(@data.length-1)
+			supervision_report_data = {
+				:id => i,
+				:supervision_report_code => @data[i][0],
+				:contract_holder => @data[i][1],
+				:contract_code => @data[i][2],
+				:concession => @data[i][3],
+				:department => @data[i][4],
+				:conclusion => @data[i][5], #.gsub(/\n/,''), #use the gsub if you want remove the newline character
+			}
 
+			RestClient.put @supervision_report_url, supervision_report_data, {:content_type => :json}
+		end
+	end
+	def process_reports_with_annotations
+		#Sheet with Julia's annotations
+		@data = []
+		CSV.foreach(@source_sheet_osinfor_conclusions, :col_sep => '|') do |row|
+			@data << row
+		end
+		puts 'Number of rows to process: '+(@data.length-1).to_s
+		for i in 1..(@data.length-1)
+			#If exist the report, then adds Julia's annotations
+			report = RestClient.get @supervision_report_url, {:params => {:supervision_report_code => @data[i][0]}}
+			if !report.scan(/\"id\":\"(\d*)\"/).flatten[0].nil?
+				remote_id = report.scan(/\"id\":\"(\d*)\"/).flatten[0]
+				puts 'Adds annotations to the supervision report Nº '+@data[i][0]
+
+				RestClient.post @supervision_report_url, {:id => remote_id, :conclusion => @data[i][4], :priority => @data[i][5]}, {:content_type => :json}
+			end
+		end
 	end
 	def process_eia_cites
 		@data = []
-		CSV.foreach(@source_sheet_eia_cites, :col_sep => "|") do |row|
+		CSV.foreach(@source_sheet_eia_cites, :col_sep => '|') do |row|
 			@data << row
 		end
 		puts 'Number of rows to process: '+(@data.length-1).to_s
@@ -78,51 +115,14 @@ class ForestalTableScrapper
 			RestClient.put @batches_url, batch_data, {:content_type => :json}
 		end
 	end
-	def process_reports
-		#Sheet with the official reports
-		@data = []
-		CSV.foreach(@source_sheet_osinfor_eia, :col_sep => "|") do |row|
-			@data << row
-		end
-		for i in 1..(@data.length-1)
-			supervision_report_data = {
-				:id => i,
-				:supervision_report_code => @data[i][0],
-				:contract_holder => @data[i][1],
-				:contract_code => @data[i][2],
-				:concession => @data[i][3],
-				:department => @data[i][4],
-				:conclusion => @data[i][5], #.gsub(/\n/,''), #use the gsub if you want remove the newline character
-			}
-
-			RestClient.put @supervision_report_url, supervision_report_data, {:content_type => :json}
-		end
-	end
-	def process_reports_with_annotations
-		#Sheet with Julia's annotations
-		@data = []
-		CSV.foreach(@source_sheet_osinfor_conclusions, :col_sep => "|") do |row|
-			@data << row
-		end
-		puts 'Number of rows to process: '+(@data.length-1).to_s
-		for i in 1..(@data.length-1)
-			#If exist the report, then adds Julia's annotations
-			if !(RestClient.get @supervision_report_url, {:params => {:supervision_report_code => @data[i][0]}}).nil?
-				remote_id = (RestClient.get @supervision_report_url, {:params => {:supervision_report_code => @data[i][0]}}).scan(/\"id\":\"(\d*)\"/).flatten[0]
-				puts 'Adds annotations to the supervision report Nº '+@data[i][0]
-
-				RestClient.post @supervision_report_url, {:id => remote_id, :conclusion => @data[i][4], :priority => @data[i][5]}, {:content_type => :json}
-			end
-		end
-	end
 end
 
 if !(defined? Test::Unit::TestCase)
 	bot = ForestalTableScrapper.new
-	puts '1/3 Procesando reportes...'
+	puts '1/3 Processing reports...'
 	bot.process_reports
-	puts '2/3 Procesando reportes con comentarios...'
+	puts '2/3 Processing reports with comments...'
 	bot.process_reports_with_annotations
-	#puts '3/3 Procesando exportaciones con lotes...'
-	#bot.process_eia_cites
+	puts '3/3 Processing exportations and batches...'
+	bot.process_eia_cites
 end
